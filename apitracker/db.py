@@ -27,8 +27,12 @@ class Database:
     """Owns a connection pool and exposes the operations the tracker needs."""
 
     def __init__(self, dsn: str | None = None, *, pool: ConnectionPool | None = None):
-        self._dsn = resolve_dsn(dsn)
-        self._pool = pool or ConnectionPool(self._dsn, min_size=1, open=True)
+        if pool is not None:
+            self._dsn = dsn
+            self._pool = pool
+        else:
+            self._dsn = resolve_dsn(dsn)
+            self._pool = ConnectionPool(self._dsn, min_size=1, open=True)
 
     @contextmanager
     def _conn(self) -> Iterator:

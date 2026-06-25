@@ -36,6 +36,10 @@ Requires Python 3.10+ and a Postgres database. Perplexity uses the OpenAI SDK.
 
 ## Setup
 
+API-Tracker needs only a Postgres database — there's no service to deploy. For
+provisioning managed Postgres (Railway / Neon / Supabase) and the connection-pooler
+gotcha, see [`DEPLOY.md`](DEPLOY.md).
+
 ```bash
 export APITRACKER_DSN="postgresql://user:pass@localhost:5432/apitracker"
 
