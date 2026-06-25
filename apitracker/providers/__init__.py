@@ -6,7 +6,8 @@ intercepted falls through via ``__getattr__``.
 """
 
 from .anthropic import TrackedAnthropic
+from .gemini import TrackedGemini
 from .openai import TrackedOpenAI
 from .perplexity import TrackedPerplexity
 
-__all__ = ["TrackedAnthropic", "TrackedOpenAI", "TrackedPerplexity"]
+__all__ = ["TrackedAnthropic", "TrackedOpenAI", "TrackedPerplexity", "TrackedGemini"]

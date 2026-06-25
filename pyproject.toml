@@ -17,7 +17,8 @@ dependencies = [
 # Provider SDKs are optional -- install only the ones your apps use.
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.40"]          # also used for Perplexity (OpenAI-compatible)
-all = ["anthropic>=0.40", "openai>=1.40"]
+gemini = ["google-genai>=1.0"]     # or the older google-generativeai; both supported
+all = ["anthropic>=0.40", "openai>=1.40", "google-genai>=1.0"]
 dev = ["pytest>=8"]
 
 [project.scripts]

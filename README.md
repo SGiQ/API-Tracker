@@ -1,8 +1,8 @@
 # API-Tracker
 
 Track and **separate LLM API usage per app** so you know what to bill each one for.
-Supports **Anthropic**, **OpenAI**, and **Perplexity**. Every call is attributed to an
-app, priced per model, and stored in **Postgres** for billing reports.
+Supports **Anthropic**, **OpenAI**, **Perplexity**, and **Google Gemini**. Every call
+is attributed to an app, priced per model, and stored in **Postgres** for billing reports.
 
 ## How it works
 
@@ -85,6 +85,28 @@ pplx = TrackedPerplexity(tracker, app="research", api_key="pplx-...")
 pplx.chat.completions.create(model="sonar",
                              messages=[{"role": "user", "content": "latest on X?"}])
 ```
+
+Google Gemini works with either Gemini SDK:
+
+```python
+from apitracker.providers import TrackedGemini
+
+# New google-genai SDK
+from google import genai
+gem = TrackedGemini(tracker, app="research", client=genai.Client())
+gem.models.generate_content(model="gemini-2.5-flash", contents="Hi")
+
+# Old google-generativeai SDK
+import google.generativeai as genai
+genai.configure(api_key="...")
+gem = TrackedGemini(tracker, app="research",
+                    client=genai.GenerativeModel("gemini-1.5-pro"))
+gem.generate_content("Hi")
+```
+
+An app that uses several providers makes **one** `Tracker` and wraps each client with
+the same `app=` tag; `report --by app-provider` then breaks the app's spend down by
+provider.
 
 The wrappers proxy the real clients unchanged — every other method/attribute passes
 through, so they're drop-in replacements.

@@ -8,7 +8,7 @@ Postgres for billing reports.
 from .db import Database
 from .pricing import Rate, compute_cost
 from .tracker import Tracker
-from .usage import Usage, from_anthropic_usage, from_openai_usage
+from .usage import Usage, from_anthropic_usage, from_gemini_usage, from_openai_usage
 
 __all__ = [
     "Tracker",
@@ -18,6 +18,7 @@ __all__ = [
     "Usage",
     "from_anthropic_usage",
     "from_openai_usage",
+    "from_gemini_usage",
 ]
 
 __version__ = "0.1.0"

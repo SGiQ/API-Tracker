@@ -9,7 +9,7 @@ from typing import Optional
 
 from .db import Database
 from .pricing import compute_cost
-from .usage import Usage, from_anthropic_usage, from_openai_usage
+from .usage import Usage, from_anthropic_usage, from_gemini_usage, from_openai_usage
 
 log = logging.getLogger("apitracker")
 
@@ -115,6 +115,21 @@ class Tracker:
             app=app,
             api_key=api_key,
             request_id=getattr(response, "id", None),
+            metadata=metadata,
+        )
+
+    def record_gemini(
+        self, response, *, app: Optional[str] = None, api_key: Optional[str] = None,
+        model: Optional[str] = None, metadata: Optional[dict] = None,
+    ) -> int:
+        """Record from a Gemini ``GenerateContentResponse`` (either SDK)."""
+        return self.record(
+            provider="gemini",
+            model=model or getattr(response, "model_version", None) or "unknown",
+            usage=from_gemini_usage(getattr(response, "usage_metadata", None) or _Empty()),
+            app=app,
+            api_key=api_key,
+            request_id=getattr(response, "response_id", None),
             metadata=metadata,
         )
 

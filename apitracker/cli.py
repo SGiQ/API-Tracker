@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     p_app.add_argument("--name")
 
     p_map = sub.add_parser("map-key", help="Map a provider API key to an app")
-    p_map.add_argument("provider", choices=["anthropic", "openai", "perplexity"])
+    p_map.add_argument("provider", choices=["anthropic", "openai", "perplexity", "gemini"])
     p_map.add_argument("app_slug")
     g = p_map.add_mutually_exclusive_group(required=True)
     g.add_argument("--key", help="The API key (will be hashed, not stored)")

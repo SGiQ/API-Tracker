@@ -85,3 +85,25 @@ def from_openai_usage(u) -> Usage:
         cached_input_tokens=cached,
         cache_write_tokens=0,
     )
+
+
+def from_gemini_usage(u) -> Usage:
+    """Normalize a Gemini ``response.usage_metadata`` object.
+
+    Works for both the new ``google-genai`` and old ``google-generativeai`` SDKs
+    (same field names). ``prompt_token_count`` is inclusive of cached tokens, so
+    the cached portion (``cached_content_token_count``) is subtracted out. Thinking
+    tokens (``thoughts_token_count``) are billed as output, so they're folded into
+    ``output_tokens`` alongside the visible ``candidates_token_count``.
+    """
+    prompt = _int(getattr(u, "prompt_token_count", 0))
+    candidates = _int(getattr(u, "candidates_token_count", 0))
+    thoughts = _int(getattr(u, "thoughts_token_count", 0))
+    cached = min(_int(getattr(u, "cached_content_token_count", 0)), prompt)
+
+    return Usage(
+        input_tokens=prompt - cached,
+        output_tokens=candidates + thoughts,
+        cached_input_tokens=cached,
+        cache_write_tokens=0,
+    )

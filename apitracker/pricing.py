@@ -91,4 +91,13 @@ SEED_PRICING: list[Rate] = [
     Rate("perplexity", "sonar-pro",           _d("3.00"), _d("15.00")),
     Rate("perplexity", "sonar-reasoning",     _d("1.00"), _d("5.00")),
     Rate("perplexity", "sonar-reasoning-pro", _d("2.00"), _d("8.00")),
+
+    # --- Google Gemini (VERIFY against https://ai.google.dev/gemini-api/docs/pricing;
+    #     Gemini uses TIERED pricing -- e.g. long-context (>200K) rates are higher --
+    #     which flat per-model rates do NOT capture. These are base-tier list prices.) -
+    Rate("gemini", "gemini-2.5-pro",   _d("1.25"), _d("10.00")),
+    Rate("gemini", "gemini-2.5-flash", _d("0.30"), _d("2.50")),
+    Rate("gemini", "gemini-2.0-flash", _d("0.10"), _d("0.40")),
+    Rate("gemini", "gemini-1.5-pro",   _d("1.25"), _d("5.00")),
+    Rate("gemini", "gemini-1.5-flash", _d("0.075"), _d("0.30")),
 ]

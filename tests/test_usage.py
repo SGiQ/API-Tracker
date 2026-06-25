@@ -1,6 +1,11 @@
 from types import SimpleNamespace
 
-from apitracker.usage import Usage, from_anthropic_usage, from_openai_usage
+from apitracker.usage import (
+    Usage,
+    from_anthropic_usage,
+    from_gemini_usage,
+    from_openai_usage,
+)
 
 
 def test_anthropic_usage_maps_buckets_directly():
@@ -41,3 +46,20 @@ def test_openai_without_cache_details():
 def test_none_values_coerced_to_zero():
     u = SimpleNamespace(prompt_tokens=None, completion_tokens=None)
     assert from_openai_usage(u) == Usage()
+
+
+def test_gemini_folds_thoughts_into_output_and_subtracts_cache():
+    u = SimpleNamespace(
+        prompt_token_count=1000,
+        candidates_token_count=200,
+        thoughts_token_count=50,        # thinking tokens billed as output
+        cached_content_token_count=400,
+    )
+    assert from_gemini_usage(u) == Usage(
+        input_tokens=600, output_tokens=250, cached_input_tokens=400,
+    )
+
+
+def test_gemini_minimal_fields():
+    u = SimpleNamespace(prompt_token_count=120, candidates_token_count=30)
+    assert from_gemini_usage(u) == Usage(input_tokens=120, output_tokens=30)
