@@ -102,4 +102,9 @@ SEED_PRICING: list[Rate] = [
     Rate("gemini", "gemini-2.0-flash", _d("0.10"), _d("0.40")),
     Rate("gemini", "gemini-1.5-pro",   _d("1.25"), _d("5.00")),
     Rate("gemini", "gemini-1.5-flash", _d("0.075"), _d("0.30")),
+
+    # --- NVIDIA NIM (VERIFY against https://build.nvidia.com / your NVIDIA contract.
+    #     These are ESTIMATES for the hosted Llama model used by Enterprise Caller --
+    #     NVIDIA bills via credits and rates vary by plan, so confirm before billing.) -
+    Rate("nvidia", "meta/llama-3.3-70b-instruct", _d("0.60"), _d("0.60")),
 ]
