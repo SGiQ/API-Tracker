@@ -1,0 +1,13 @@
+# Railway/Nixpacks build for the API-Tracker ingest service.
+# Installs the package with the [server] extra (FastAPI + uvicorn) and starts the
+# HTTP ingestion endpoint. Railway injects $PORT and $APITRACKER_DSN (point the
+# latter at this project's Postgres via the internal DATABASE_URL reference).
+
+[phases.install]
+cmds = [
+    "python -m pip install --upgrade pip",
+    "pip install .[server]",
+]
+
+[start]
+cmd = "apitracker serve"

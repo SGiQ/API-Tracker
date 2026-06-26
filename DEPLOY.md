@@ -1,12 +1,12 @@
 # Deployment
 
-API-Tracker is a **library + CLI**, not a web service — there's nothing to deploy
-to Vercel/Railway as an app. The only thing it needs hosted is a **Postgres
-database**. Provision one with a managed provider and point `APITRACKER_DSN` at it.
+API-Tracker is a **library + CLI** that needs a **Postgres database**. That alone
+is enough if your apps import the library and write to the DB directly. To track
+**many apps without sharing the DSN**, also deploy the **HTTP ingestion service**
+(section 4) — apps then POST usage with a per-app key instead of holding DB creds.
 
-> If you later want apps to report usage over HTTP (a central ingestion API) or a
-> browser dashboard, those are separate services we can add. For now, a database
-> is all that's required.
+> A browser dashboard is still a separate service we can add later. For now: a
+> database (required) plus, optionally, the ingestion service.
 
 ## 1. Provision managed Postgres
 
@@ -40,6 +40,40 @@ apitracker load-pricing   # load seed pricing (then verify OpenAI/Perplexity rat
 ```
 
 That's it — your apps can now record usage and you can run `apitracker report`.
+
+## 4. (Optional) Deploy the HTTP ingestion service
+
+Run this when multiple apps should report usage without each holding the DSN.
+It's a FastAPI app that fronts `Tracker.record()`; apps authenticate with a
+per-app key (`X-App-Key`) issued by `apitracker issue-key`.
+
+**Railway (same project as the Postgres — recommended):**
+
+1. **New service → Deploy from the API-Tracker repo.** The bundled
+   [`nixpacks.toml`](nixpacks.toml) installs `.[server]` and starts `apitracker serve`.
+2. **Set `APITRACKER_DSN`** on the service to the Postgres' **internal** URL via a
+   reference variable — `${{ Postgres.DATABASE_URL }}` — so traffic stays on
+   Railway's private network and the DB is never publicly exposed.
+3. Railway injects `$PORT`; the service binds it automatically.
+4. **Health check path:** `/healthz`.
+5. Note the service's public URL — that's the `APITRACKER_URL` your apps POST to.
+
+**Issue a key per app** (run against the DB, e.g. locally with the public DSN, or
+from a Railway shell):
+
+```bash
+apitracker add-app chatbot --name "Customer Chatbot"
+apitracker issue-key chatbot --label prod     # prints the key once — store it
+```
+
+Each app then needs just two env vars: `APITRACKER_URL` and its `X-App-Key`. No
+database credentials leave the tracker's own project.
+
+> **Auth & exposure.** The ingest endpoint is public (apps call it over the
+> internet), but it does nothing without a valid key, and a key can only write
+> usage for its own app. Keep keys in each app's secret manager; revoke a leaked
+> one by setting `revoked_at` in `app_keys`. Put it behind your platform's TLS
+> (Railway terminates HTTPS for you).
 
 ## Connection pooler gotcha (Supabase / PgBouncer / Neon pooled endpoint)
 

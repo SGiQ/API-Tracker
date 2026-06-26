@@ -4,6 +4,8 @@
     apitracker load-pricing
     apitracker add-app <slug> [--name NAME]
     apitracker map-key <provider> <app-slug> [--key KEY | --key-env VAR]
+    apitracker issue-key <app-slug> [--label LABEL]
+    apitracker serve [--host HOST] [--port PORT]
     apitracker report [--since ISO] [--until ISO] [--by app|provider|app-provider|model]
 """
 
@@ -17,6 +19,7 @@ from decimal import Decimal
 
 from .db import Database
 from .pricing import SEED_PRICING
+from .tracker import Tracker
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -85,6 +88,14 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--key", help="The API key (will be hashed, not stored)")
     g.add_argument("--key-env", help="Env var holding the API key")
 
+    p_key = sub.add_parser("issue-key", help="Issue an ingest API key for an app")
+    p_key.add_argument("app_slug")
+    p_key.add_argument("--label", help="Human label for this key (e.g. 'prod', 'railway')")
+
+    p_serve = sub.add_parser("serve", help="Run the HTTP usage-ingestion service")
+    p_serve.add_argument("--host", default="0.0.0.0")
+    p_serve.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
+
     p_rep = sub.add_parser("report", help="Billing report")
     p_rep.add_argument("--since")
     p_rep.add_argument("--until")
@@ -112,6 +123,19 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             db.map_key(args.provider, key, args.app_slug)
             print(f"Mapped {args.provider} key ...{key[-4:]} -> {args.app_slug}")
+        elif args.cmd == "issue-key":
+            key, last4 = db.issue_app_key(args.app_slug, label=args.label)
+            print(
+                f"Issued ingest key for {args.app_slug!r} (...{last4}).\n"
+                f"Store it now -- it will not be shown again:\n\n    {key}\n"
+            )
+        elif args.cmd == "serve":
+            import uvicorn
+
+            from .server import create_app
+
+            print(f"Starting API-Tracker ingest on {args.host}:{args.port}")
+            uvicorn.run(create_app(Tracker(db)), host=args.host, port=args.port)
         elif args.cmd == "report":
             rows = db.report(
                 since=_parse_dt(args.since),

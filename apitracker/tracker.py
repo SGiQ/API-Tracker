@@ -49,13 +49,19 @@ class Tracker:
         model: str,
         usage: Usage,
         app: Optional[str] = None,
+        app_id: Optional[int] = None,
         api_key: Optional[str] = None,
         request_id: Optional[str] = None,
         metadata: Optional[dict] = None,
         occurred_at: Optional[datetime] = None,
     ) -> int:
-        """Record a normalized :class:`Usage`. Returns the event id."""
-        app_id = self._resolve_app_id(provider=provider, app=app, api_key=api_key)
+        """Record a normalized :class:`Usage`. Returns the event id.
+
+        Pass ``app_id`` when the app is already resolved (e.g. the ingest service
+        resolved it from an API key); otherwise it's derived from ``app`` / ``api_key``.
+        """
+        if app_id is None:
+            app_id = self._resolve_app_id(provider=provider, app=app, api_key=api_key)
 
         rate = self.db.current_rate(provider, model, at=occurred_at)
         cost: Optional[Decimal]

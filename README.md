@@ -141,6 +141,39 @@ tracker.record(provider="anthropic", model="claude-opus-4-8",
                app="chatbot", metadata={"endpoint": "/summarize"})
 ```
 
+## HTTP ingestion service — track many apps without sharing the DSN
+
+When several apps report usage, you don't want to hand each one the database DSN
+and a copy of the pricing logic. Run the bundled ingestion service instead: apps
+POST usage with a per-app key and never touch Postgres. The service is a thin
+front door — it just calls `Tracker.record()`, so attribution and pricing stay
+in one place.
+
+```bash
+pip install -e ".[server]"
+
+apitracker add-app chatbot --name "Customer Chatbot"
+apitracker issue-key chatbot --label prod    # prints the key ONCE — store it
+apitracker serve                             # listens on $PORT (default 8000)
+```
+
+Apps then fire a single request per call (fire-and-forget; never block the LLM path):
+
+```bash
+curl -X POST "$APITRACKER_URL/v1/usage" \
+  -H "X-App-Key: atk_…" -H "content-type: application/json" \
+  -d '{"provider":"anthropic","model":"claude-opus-4-8",
+       "input_tokens":1000,"output_tokens":500,
+       "cached_input_tokens":0,"cache_write_tokens":0,
+       "request_id":"req_123","metadata":{"endpoint":"/chat"}}'
+# → {"id": 91}
+```
+
+The app is resolved from the **key**, not the request body, so a leaked key can
+only ever write usage for its own app. Keys are stored as a SHA-256 hash (plus
+last 4); revoke one by setting `revoked_at` in `app_keys`. `GET /healthz` returns
+`{"ok": true}` for platform health checks. See [`DEPLOY.md`](DEPLOY.md) to host it.
+
 ## Billing reports
 
 ```bash
@@ -167,6 +200,7 @@ however your billing system needs.
 | ------------------ | ------------------------------------------------------------- |
 | `apps`             | Apps you bill separately (`slug`, `name`).                     |
 | `provider_key_map` | Provider API key → app (key stored as SHA-256 hash + last 4). |
+| `app_keys`         | Per-app ingest keys for the HTTP service (SHA-256 hash + last 4). |
 | `model_pricing`    | USD/Mtok rates per model, with effective dates.                |
 | `usage_events`     | One row per recorded call: tokens, cost, app, provider, model. |
 
