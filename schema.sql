@@ -22,6 +22,22 @@ CREATE TABLE IF NOT EXISTS provider_key_map (
     UNIQUE (provider, key_hash)
 );
 
+-- Ingest API keys: per-app bearer keys for the HTTP ingestion service, so apps
+-- can POST usage without ever holding the database DSN. Only a SHA-256 hash is
+-- stored (plus the last 4 chars for display); the plaintext key is shown once,
+-- at issue time. Revoke a key by setting revoked_at.
+CREATE TABLE IF NOT EXISTS app_keys (
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    app_id      BIGINT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    key_hash    TEXT NOT NULL UNIQUE,        -- sha256(key) hex
+    key_last4   TEXT NOT NULL,
+    label       TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at  TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_keys_app ON app_keys (app_id);
+
 -- Per-model pricing in USD per 1,000,000 tokens, with effective dates so that
 -- historical events are costed at the rate that was current when they happened.
 CREATE TABLE IF NOT EXISTS model_pricing (

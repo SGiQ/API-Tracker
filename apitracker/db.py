@@ -16,7 +16,7 @@ from typing import Iterator, Optional
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from .config import hash_key, key_last4, resolve_dsn
+from .config import hash_key, key_last4, new_app_key, resolve_dsn
 from .pricing import Rate
 from .usage import Usage
 
@@ -142,6 +142,43 @@ class Database:
             row = conn.execute(
                 "SELECT app_id FROM provider_key_map WHERE provider = %s AND key_hash = %s",
                 (provider, hash_key(api_key)),
+            ).fetchone()
+            return row["app_id"] if row else None
+
+    # -- ingest API keys (HTTP service auth) -------------------------------
+
+    def issue_app_key(self, app_slug: str, *, label: str | None = None) -> tuple[str, str]:
+        """Create a new ingest key for an app. Returns ``(plaintext_key, last4)``.
+
+        The plaintext is returned only here and never stored -- callers must
+        capture it at issue time. Only its hash + last4 are persisted.
+        """
+        app_id = self.app_id_by_slug(app_slug)
+        if app_id is None:
+            raise ValueError(f"Unknown app slug: {app_slug!r}. Create it first.")
+        key = new_app_key()
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO app_keys (app_id, key_hash, key_last4, label)
+                VALUES (%(app_id)s, %(hash)s, %(last4)s, %(label)s)
+                """,
+                {
+                    "app_id": app_id,
+                    "hash": hash_key(key),
+                    "last4": key_last4(key),
+                    "label": label,
+                },
+            )
+            conn.commit()
+        return key, key_last4(key)
+
+    def app_id_by_app_key(self, api_key: str) -> Optional[int]:
+        """Resolve an ingest key to its app_id, ignoring revoked keys."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT app_id FROM app_keys WHERE key_hash = %s AND revoked_at IS NULL",
+                (hash_key(api_key),),
             ).fetchone()
             return row["app_id"] if row else None
 

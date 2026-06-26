@@ -75,6 +75,8 @@ SEED_PRICING: list[Rate] = [
     Rate("anthropic", "claude-sonnet-4-6", _d("3"), _d("15"), _d("0.3"),  _d("3.75")),
     Rate("anthropic", "claude-sonnet-4-5", _d("3"), _d("15"), _d("0.3"),  _d("3.75")),
     Rate("anthropic", "claude-haiku-4-5", _d("1"),  _d("5"),  _d("0.1"),  _d("1.25")),
+    # Dated snapshot ids share the base model's pricing; add each one callers pin to.
+    Rate("anthropic", "claude-haiku-4-5-20251001", _d("1"), _d("5"), _d("0.1"), _d("1.25")),
 
     # --- OpenAI (VERIFY against https://openai.com/api/pricing) ------------
     Rate("openai", "gpt-4o",        _d("2.50"), _d("10.00"), _d("1.25")),
