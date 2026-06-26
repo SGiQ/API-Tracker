@@ -170,8 +170,12 @@ curl -X POST "$APITRACKER_URL/v1/usage" \
 ```
 
 `user_id` is optional — the app's own user identifier (store the stable id, not
-PII). It enables per-user reporting: `report --by app-user` / `--by user`, the
-`?user=` filter, and the dashboard's "app + user" / "user" groupings.
+PII). It enables per-user reporting and the `?user=` filter.
+
+Reports group by **any combination** of `app`, `user`, `provider`, `model`
+(joined by `-` or `,`): `--by model`, `--by user-model`, `--by app-user`,
+`--by app-provider-model`, etc. The dashboard exposes the four dimensions as
+checkboxes; the CLI and `/v1/report?by=…` take the same combos.
 
 The app is resolved from the **key**, not the request body, so a leaked key can
 only ever write usage for its own app. Keys are stored as a SHA-256 hash (plus
@@ -181,8 +185,9 @@ last 4); revoke one by setting `revoked_at` in `app_keys`. `GET /healthz` return
 ### Dashboard
 
 The same service serves a browser **dashboard** at `GET /` (and JSON at
-`GET /v1/report?by=app-provider&since=…&until=…`) — a billing table + spend-by-app
-bars over the same data the CLI `report` shows. Both are gated by
+`GET /v1/report?by=app-provider&since=…&until=…`) — a billing table + spend bars
+over the same data the CLI `report` shows, with dimension checkboxes (app, user,
+provider, model), date filters, and a per-user filter. Both are gated by
 `APITRACKER_DASHBOARD_KEY`; set it to enable them (unset → 503, ingestion still works).
 The key is entered in the browser (stored in `localStorage`) or passed as `?key=`.
 
