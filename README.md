@@ -174,6 +174,14 @@ only ever write usage for its own app. Keys are stored as a SHA-256 hash (plus
 last 4); revoke one by setting `revoked_at` in `app_keys`. `GET /healthz` returns
 `{"ok": true}` for platform health checks. See [`DEPLOY.md`](DEPLOY.md) to host it.
 
+### Dashboard
+
+The same service serves a browser **dashboard** at `GET /` (and JSON at
+`GET /v1/report?by=app-provider&since=…&until=…`) — a billing table + spend-by-app
+bars over the same data the CLI `report` shows. Both are gated by
+`APITRACKER_DASHBOARD_KEY`; set it to enable them (unset → 503, ingestion still works).
+The key is entered in the browser (stored in `localStorage`) or passed as `?key=`.
+
 ## Billing reports
 
 ```bash

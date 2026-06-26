@@ -54,9 +54,13 @@ per-app key (`X-App-Key`) issued by `apitracker issue-key`.
 2. **Set `APITRACKER_DSN`** on the service to the Postgres' **internal** URL via a
    reference variable — `${{ Postgres.DATABASE_URL }}` — so traffic stays on
    Railway's private network and the DB is never publicly exposed.
-3. Railway injects `$PORT`; the service binds it automatically.
-4. **Health check path:** `/healthz`.
-5. Note the service's public URL — that's the `APITRACKER_URL` your apps POST to.
+3. **Set `APITRACKER_DASHBOARD_KEY`** to a long random secret to enable the billing
+   dashboard (`GET /` + `GET /v1/report`). Leave it unset and those endpoints return
+   503 — usage ingestion still works; only the dashboard is gated.
+4. Railway injects `$PORT`; the service binds it automatically.
+5. **Health check path:** `/healthz`.
+6. Note the service's public URL — that's the `APITRACKER_URL` your apps POST to,
+   and `https://<url>/` is the dashboard (enter the dashboard key when prompted).
 
 **Issue a key per app** (run against the DB, e.g. locally with the public DSN, or
 from a Railway shell):
