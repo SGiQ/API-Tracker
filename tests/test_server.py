@@ -32,7 +32,15 @@ class _FakeDB:
     def app_id_by_app_key(self, api_key: str):
         return self._keys.get(api_key)
 
-    def report(self, *, since=None, until=None, group_by="app-provider"):
+    def report(self, *, since=None, until=None, group_by="app-provider", user=None):
+        self.last_report = {"group_by": group_by, "user": user}
+        if group_by in ("user", "app-user"):
+            row = {"user": user or "user_42", "calls": 1, "input_tokens": 100,
+                   "output_tokens": 50, "cached_input_tokens": 0, "cache_write_tokens": 0,
+                   "cost_usd": 0.0019, "unpriced_calls": 0}
+            if group_by == "app-user":
+                row = {"app": "nia", **row}
+            return [row]
         return _REPORT_ROWS
 
 
@@ -161,3 +169,35 @@ def test_dashboard_page_served():
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "API-Tracker" in resp.text
+
+
+# ── per-user attribution ──────────────────────────────────────────────────────
+
+def test_ingest_passes_user_id_through_to_record():
+    client, tracker = _client({"atk_valid": 7})
+    resp = client.post(
+        "/v1/usage",
+        headers={"X-App-Key": "atk_valid"},
+        json={"provider": "anthropic", "model": "claude-opus-4-8",
+              "input_tokens": 10, "output_tokens": 5, "user_id": "user_42"},
+    )
+    assert resp.status_code == 200
+    assert tracker.calls[0]["user_id"] == "user_42"
+
+
+def test_report_by_app_user_returns_user_dimension():
+    client, tracker = _client(dashboard_key="secret")
+    resp = client.get("/v1/report?by=app-user", headers={"X-Dashboard-Key": "secret"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["by"] == "app-user"
+    assert "user" in body["rows"][0] and "app" in body["rows"][0]
+    assert tracker.db.last_report["group_by"] == "app-user"
+
+
+def test_report_user_filter_is_forwarded():
+    client, tracker = _client(dashboard_key="secret")
+    resp = client.get("/v1/report?by=user&user=user_42", headers={"X-Dashboard-Key": "secret"})
+    assert resp.status_code == 200
+    assert tracker.db.last_report["user"] == "user_42"
+    assert resp.json()["rows"][0]["user"] == "user_42"

@@ -165,9 +165,13 @@ curl -X POST "$APITRACKER_URL/v1/usage" \
   -d '{"provider":"anthropic","model":"claude-opus-4-8",
        "input_tokens":1000,"output_tokens":500,
        "cached_input_tokens":0,"cache_write_tokens":0,
-       "request_id":"req_123","metadata":{"endpoint":"/chat"}}'
+       "request_id":"req_123","user_id":"u_123","metadata":{"endpoint":"/chat"}}'
 # → {"id": 91}
 ```
+
+`user_id` is optional — the app's own user identifier (store the stable id, not
+PII). It enables per-user reporting: `report --by app-user` / `--by user`, the
+`?user=` filter, and the dashboard's "app + user" / "user" groupings.
 
 The app is resolved from the **key**, not the request body, so a leaked key can
 only ever write usage for its own app. Keys are stored as a SHA-256 hash (plus

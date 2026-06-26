@@ -52,6 +52,7 @@ class Tracker:
         app_id: Optional[int] = None,
         api_key: Optional[str] = None,
         request_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         metadata: Optional[dict] = None,
         occurred_at: Optional[datetime] = None,
     ) -> int:
@@ -59,6 +60,7 @@ class Tracker:
 
         Pass ``app_id`` when the app is already resolved (e.g. the ingest service
         resolved it from an API key); otherwise it's derived from ``app`` / ``api_key``.
+        ``user_id`` is the app's own user identifier (stored for per-user billing).
         """
         if app_id is None:
             app_id = self._resolve_app_id(provider=provider, app=app, api_key=api_key)
@@ -83,6 +85,7 @@ class Tracker:
             usage=usage,
             cost_usd=cost,
             request_id=request_id,
+            external_user_id=user_id,
             metadata=metadata,
             occurred_at=occurred_at,
         )

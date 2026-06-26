@@ -41,7 +41,7 @@ def _print_report(rows: list[dict]) -> None:
         print("No usage in the selected window.")
         return
 
-    dim_keys = [k for k in ("app", "provider", "model") if k in rows[0]]
+    dim_keys = [k for k in ("app", "user", "provider", "model") if k in rows[0]]
     headers = dim_keys + ["calls", "in_tok", "out_tok", "cached", "cost_usd", "unpriced"]
 
     table = [headers]
@@ -101,8 +101,9 @@ def main(argv: list[str] | None = None) -> int:
     p_rep.add_argument("--until")
     p_rep.add_argument(
         "--by", default="app-provider",
-        choices=["app", "provider", "app-provider", "model"],
+        choices=["app", "provider", "app-provider", "model", "user", "app-user"],
     )
+    p_rep.add_argument("--user", help="Filter to a single external user id")
 
     args = parser.parse_args(argv)
     db = Database(args.dsn)
@@ -141,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
                 since=_parse_dt(args.since),
                 until=_parse_dt(args.until),
                 group_by=args.by,
+                user=args.user,
             )
             _print_report(rows)
     finally:

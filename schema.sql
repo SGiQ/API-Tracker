@@ -64,10 +64,16 @@ CREATE TABLE IF NOT EXISTS usage_events (
     cache_write_tokens   BIGINT NOT NULL DEFAULT 0,
     cost_usd             NUMERIC(14, 6),       -- NULL = no pricing found (unpriced)
     request_id           TEXT,
+    external_user_id     TEXT,                 -- app's own user id (NULL = not attributed to a user)
     metadata             JSONB NOT NULL DEFAULT '{}'::jsonb,
     occurred_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Additive migration for databases created before external_user_id existed.
+-- (The CREATE above is skipped when the table already exists, so add it here too.)
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS external_user_id TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_usage_events_app_time      ON usage_events (app_id, occurred_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_provider_time ON usage_events (provider, occurred_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_occurred_at   ON usage_events (occurred_at);
+CREATE INDEX IF NOT EXISTS idx_usage_events_app_user      ON usage_events (app_id, external_user_id);

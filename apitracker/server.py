@@ -36,7 +36,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - import-time guard
 from .tracker import Tracker
 from .usage import Usage
 
-_GROUP_BY = ("app", "provider", "app-provider", "model")
+_GROUP_BY = ("app", "provider", "app-provider", "model", "user", "app-user")
 
 
 class UsageIn(BaseModel):
@@ -49,6 +49,7 @@ class UsageIn(BaseModel):
     cached_input_tokens: int = Field(0, ge=0)
     cache_write_tokens: int = Field(0, ge=0)
     request_id: Optional[str] = None
+    user_id: Optional[str] = None  # the app's own user id, for per-user billing
     metadata: Optional[dict] = None
     occurred_at: Optional[datetime] = None
 
@@ -61,7 +62,7 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
 
 
 def _normalize_row(r: dict) -> dict:
-    out = {k: r[k] for k in ("app", "provider", "model") if k in r}
+    out = {k: r[k] for k in ("app", "user", "provider", "model") if k in r}
     out.update(
         calls=int(r["calls"] or 0),
         input_tokens=int(r["input_tokens"] or 0),
@@ -114,6 +115,7 @@ def create_app(tracker: Tracker | None = None, dashboard_key: str | None = None)
                 cache_write_tokens=u.cache_write_tokens,
             ),
             request_id=u.request_id,
+            user_id=u.user_id,
             metadata=u.metadata,
             occurred_at=u.occurred_at,
         )
@@ -124,13 +126,16 @@ def create_app(tracker: Tracker | None = None, dashboard_key: str | None = None)
         by: str = "app-provider",
         since: Optional[str] = None,
         until: Optional[str] = None,
+        user: Optional[str] = None,
         _: None = Depends(require_dashboard),
     ) -> dict:
         if by not in _GROUP_BY:
             raise HTTPException(status_code=400, detail=f"by must be one of {list(_GROUP_BY)}")
         rows = [
             _normalize_row(r)
-            for r in _tracker.db.report(since=_parse_dt(since), until=_parse_dt(until), group_by=by)
+            for r in _tracker.db.report(
+                since=_parse_dt(since), until=_parse_dt(until), group_by=by, user=user or None
+            )
         ]
         total = round(sum(r["cost_usd"] for r in rows), 6)
         return {"by": by, "rows": rows, "total_cost_usd": total}
@@ -197,10 +202,13 @@ _DASHBOARD_HTML = """<!doctype html>
       <option value="app-provider" selected>app + provider</option>
       <option value="provider">provider</option>
       <option value="model">app + provider + model</option>
+      <option value="app-user">app + user</option>
+      <option value="user">user</option>
     </select>
   </div>
   <div><label>Since</label><input type="date" id="since" /></div>
   <div><label>Until</label><input type="date" id="until" /></div>
+  <div><label>User filter</label><input type="text" id="user" placeholder="user id" size="16" /></div>
   <button id="refresh">Refresh</button>
   <button id="rekey" title="Change dashboard key">Key</button>
 </div>
@@ -221,10 +229,11 @@ const fmtUsd = (n) => '$' + Number(n).toFixed(4);
 const fmtInt = (n) => Number(n).toLocaleString();
 
 async function load() {
-  const by = $('by').value, since = $('since').value, until = $('until').value;
+  const by = $('by').value, since = $('since').value, until = $('until').value, user = $('user').value.trim();
   const p = new URLSearchParams({ by });
   if (since) p.set('since', since);
   if (until) p.set('until', until);
+  if (user) p.set('user', user);
   $('status').textContent = 'Loading…';
   let res;
   try { res = await fetch('/v1/report?' + p, { headers: { 'X-Dashboard-Key': getKey() } }); }
@@ -238,7 +247,7 @@ async function load() {
 function render(data) {
   $('total').textContent = fmtUsd(data.total_cost_usd);
   const rows = data.rows || [];
-  const dims = ['app', 'provider', 'model'].filter((d) => rows[0] && d in rows[0]);
+  const dims = ['app', 'user', 'provider', 'model'].filter((d) => rows[0] && d in rows[0]);
   const cols = [...dims, 'calls', 'input_tokens', 'output_tokens', 'cached_input_tokens', 'cache_write_tokens', 'cost_usd', 'unpriced_calls'];
   const labels = { input_tokens: 'in', output_tokens: 'out', cached_input_tokens: 'cached', cache_write_tokens: 'cache wr', cost_usd: 'cost', unpriced_calls: 'unpriced' };
 

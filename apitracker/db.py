@@ -223,6 +223,7 @@ class Database:
         usage: Usage,
         cost_usd: Optional[Decimal],
         request_id: Optional[str] = None,
+        external_user_id: Optional[str] = None,
         metadata: Optional[dict] = None,
         occurred_at: Optional[datetime] = None,
     ) -> int:
@@ -234,9 +235,9 @@ class Database:
                 INSERT INTO usage_events
                     (app_id, provider, model, input_tokens, output_tokens,
                      cached_input_tokens, cache_write_tokens, cost_usd, request_id,
-                     metadata, occurred_at)
+                     external_user_id, metadata, occurred_at)
                 VALUES (%(app_id)s, %(provider)s, %(model)s, %(in)s, %(out)s,
-                        %(cin)s, %(cw)s, %(cost)s, %(req)s, %(meta)s::jsonb,
+                        %(cin)s, %(cw)s, %(cost)s, %(req)s, %(user)s, %(meta)s::jsonb,
                         COALESCE(%(at)s, now()))
                 RETURNING id
                 """,
@@ -250,6 +251,7 @@ class Database:
                     "cw": usage.cache_write_tokens,
                     "cost": cost_usd,
                     "req": request_id,
+                    "user": external_user_id,
                     "meta": json.dumps(metadata or {}),
                     "at": occurred_at,
                 },
@@ -265,16 +267,20 @@ class Database:
         since: Optional[datetime] = None,
         until: Optional[datetime] = None,
         group_by: str = "app-provider",
+        user: Optional[str] = None,
     ) -> list[dict]:
         """Aggregate usage and cost over a time window.
 
-        ``group_by`` is one of ``app``, ``provider``, ``app-provider``, ``model``.
+        ``group_by`` is one of ``app``, ``provider``, ``app-provider``, ``model``,
+        ``user``, ``app-user``. ``user`` optionally filters to a single user id.
         """
         dims = {
             "app": ["app"],
             "provider": ["provider"],
             "app-provider": ["app", "provider"],
             "model": ["app", "provider", "model"],
+            "user": ["user"],
+            "app-user": ["app", "user"],
         }
         if group_by not in dims:
             raise ValueError(f"group_by must be one of {sorted(dims)}")
@@ -283,15 +289,16 @@ class Database:
             "app": "COALESCE(a.slug, '(unattributed)') AS app",
             "provider": "e.provider AS provider",
             "model": "e.model AS model",
+            "user": "COALESCE(e.external_user_id, '(none)') AS \"user\"",
+        }
+        group_expr = {
+            "app": "COALESCE(a.slug, '(unattributed)')",
+            "provider": "e.provider",
+            "model": "e.model",
+            "user": "COALESCE(e.external_user_id, '(none)')",
         }
         cols = [select_cols[d] for d in dims[group_by]]
-        group_exprs = []
-        for d in dims[group_by]:
-            group_exprs.append(
-                "COALESCE(a.slug, '(unattributed)')" if d == "app"
-                else "e.provider" if d == "provider"
-                else "e.model"
-            )
+        group_exprs = [group_expr[d] for d in dims[group_by]]
 
         where = []
         params: dict = {}
@@ -301,6 +308,9 @@ class Database:
         if until is not None:
             where.append("e.occurred_at < %(until)s")
             params["until"] = until
+        if user is not None:
+            where.append("e.external_user_id = %(user)s")
+            params["user"] = user
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
         sql = f"""
