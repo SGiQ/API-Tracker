@@ -157,7 +157,11 @@ apitracker issue-key chatbot --label prod    # prints the key ONCE — store it
 apitracker serve                             # listens on $PORT (default 8000)
 ```
 
-Apps then fire a single request per call (fire-and-forget; never block the LLM path):
+**Client SDKs** wrap the provider client so calls record themselves — no DB creds:
+- **Node:** `@sgiq/apitracker` — [github:SGiQ/apitracker-node](https://github.com/SGiQ/apitracker-node) (Anthropic, OpenAI, Gemini).
+- **Python:** [`clients/python`](clients/python) — `pip install` from this repo (OpenAI, Anthropic).
+
+Or fire a single request per call directly (fire-and-forget; never block the LLM path):
 
 ```bash
 curl -X POST "$APITRACKER_URL/v1/usage" \
