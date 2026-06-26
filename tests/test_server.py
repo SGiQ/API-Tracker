@@ -15,12 +15,25 @@ from fastapi.testclient import TestClient  # noqa: E402
 from apitracker.server import create_app  # noqa: E402
 
 
+_REPORT_ROWS = [
+    {"app": "nia", "provider": "anthropic", "calls": 2, "input_tokens": 1000,
+     "output_tokens": 500, "cached_input_tokens": 0, "cache_write_tokens": 0,
+     "cost_usd": 0.0175, "unpriced_calls": 0},
+    {"app": "dca-bot", "provider": "openai", "calls": 1, "input_tokens": 600,
+     "output_tokens": 200, "cached_input_tokens": 0, "cache_write_tokens": 0,
+     "cost_usd": 0.0040, "unpriced_calls": 1},
+]
+
+
 class _FakeDB:
     def __init__(self, keys: dict[str, int]):
         self._keys = keys
 
     def app_id_by_app_key(self, api_key: str):
         return self._keys.get(api_key)
+
+    def report(self, *, since=None, until=None, group_by="app-provider"):
+        return _REPORT_ROWS
 
 
 class _FakeTracker:
@@ -35,9 +48,9 @@ class _FakeTracker:
         return 4242
 
 
-def _client(keys=None):
+def _client(keys=None, dashboard_key=None):
     tracker = _FakeTracker(keys or {"atk_valid": 7})
-    return TestClient(create_app(tracker)), tracker
+    return TestClient(create_app(tracker, dashboard_key=dashboard_key)), tracker
 
 
 def test_healthz_ok():
@@ -105,3 +118,46 @@ def test_negative_tokens_are_rejected():
     )
     assert resp.status_code == 422
     assert tracker.calls == []
+
+
+# ── dashboard + report ────────────────────────────────────────────────────────
+
+def test_report_disabled_without_dashboard_key():
+    client, _ = _client()  # no dashboard_key configured
+    resp = client.get("/v1/report", headers={"X-Dashboard-Key": "anything"})
+    assert resp.status_code == 503
+
+
+def test_report_rejects_wrong_dashboard_key():
+    client, _ = _client(dashboard_key="secret")
+    assert client.get("/v1/report").status_code == 401
+    assert client.get("/v1/report", headers={"X-Dashboard-Key": "nope"}).status_code == 401
+
+
+def test_report_returns_aggregates_with_valid_key():
+    client, _ = _client(dashboard_key="secret")
+    # key accepted via header OR ?key= query (so a browser link works)
+    for resp in (
+        client.get("/v1/report?by=app", headers={"X-Dashboard-Key": "secret"}),
+        client.get("/v1/report?by=app&key=secret"),
+    ):
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["by"] == "app"
+        assert len(body["rows"]) == 2
+        assert body["rows"][0]["app"] == "nia"
+        assert round(body["total_cost_usd"], 4) == 0.0215  # 0.0175 + 0.0040
+
+
+def test_report_rejects_bad_group_by():
+    client, _ = _client(dashboard_key="secret")
+    resp = client.get("/v1/report?by=bogus", headers={"X-Dashboard-Key": "secret"})
+    assert resp.status_code == 400
+
+
+def test_dashboard_page_served():
+    client, _ = _client(dashboard_key="secret")
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "API-Tracker" in resp.text
