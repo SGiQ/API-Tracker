@@ -33,10 +33,9 @@ except ModuleNotFoundError as exc:  # pragma: no cover - import-time guard
         "The ingest service needs FastAPI. Install it with: pip install \"api-tracker[server]\""
     ) from exc
 
+from .db import parse_dimensions
 from .tracker import Tracker
 from .usage import Usage
-
-_GROUP_BY = ("app", "provider", "app-provider", "model", "user", "app-user")
 
 
 class UsageIn(BaseModel):
@@ -129,8 +128,10 @@ def create_app(tracker: Tracker | None = None, dashboard_key: str | None = None)
         user: Optional[str] = None,
         _: None = Depends(require_dashboard),
     ) -> dict:
-        if by not in _GROUP_BY:
-            raise HTTPException(status_code=400, detail=f"by must be one of {list(_GROUP_BY)}")
+        try:
+            parse_dimensions(by)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         rows = [
             _normalize_row(r)
             for r in _tracker.db.report(
@@ -187,6 +188,10 @@ _DASHBOARD_HTML = """<!doctype html>
   .bar-fill { height: 16px; background: linear-gradient(90deg,#3b82f6,#7dd3fc); }
   .bar-val { width: 90px; text-align: right; color: #7dd3fc; font-variant-numeric: tabular-nums; }
   .muted { color: #8b93a1; }
+  .dims { display: flex; gap: 12px; align-items: center; padding-top: 2px; }
+  .cb { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 13px;
+        text-transform: none; letter-spacing: 0; color: #c7cdd6; cursor: pointer; }
+  .cb input { accent-color: #3b82f6; }
 </style>
 </head>
 <body>
@@ -197,14 +202,12 @@ _DASHBOARD_HTML = """<!doctype html>
 </header>
 <div class="controls">
   <div><label>Group by</label>
-    <select id="by">
-      <option value="app">app</option>
-      <option value="app-provider" selected>app + provider</option>
-      <option value="provider">provider</option>
-      <option value="model">app + provider + model</option>
-      <option value="app-user">app + user</option>
-      <option value="user">user</option>
-    </select>
+    <div class="dims">
+      <label class="cb"><input type="checkbox" class="dim" value="app" checked> app</label>
+      <label class="cb"><input type="checkbox" class="dim" value="user"> user</label>
+      <label class="cb"><input type="checkbox" class="dim" value="provider" checked> provider</label>
+      <label class="cb"><input type="checkbox" class="dim" value="model"> model</label>
+    </div>
   </div>
   <div><label>Since</label><input type="date" id="since" /></div>
   <div><label>Until</label><input type="date" id="until" /></div>
@@ -229,7 +232,9 @@ const fmtUsd = (n) => '$' + Number(n).toFixed(4);
 const fmtInt = (n) => Number(n).toLocaleString();
 
 async function load() {
-  const by = $('by').value, since = $('since').value, until = $('until').value, user = $('user').value.trim();
+  const checked = [...document.querySelectorAll('.dim:checked')].map((c) => c.value);
+  const by = checked.length ? checked.join('-') : 'app';
+  const since = $('since').value, until = $('until').value, user = $('user').value.trim();
   const p = new URLSearchParams({ by });
   if (since) p.set('since', since);
   if (until) p.set('until', until);
@@ -274,7 +279,7 @@ function render(data) {
 }
 
 $('refresh').onclick = load;
-$('by').onchange = load;
+document.querySelectorAll('.dim').forEach((c) => { c.onchange = load; });
 $('rekey').onclick = () => { getKey(true); load(); };
 load();
 </script>

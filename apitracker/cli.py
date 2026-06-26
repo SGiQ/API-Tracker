@@ -6,7 +6,8 @@
     apitracker map-key <provider> <app-slug> [--key KEY | --key-env VAR]
     apitracker issue-key <app-slug> [--label LABEL]
     apitracker serve [--host HOST] [--port PORT]
-    apitracker report [--since ISO] [--until ISO] [--by app|provider|app-provider|model]
+    apitracker report [--since ISO] [--until ISO] [--by <dims>] [--user ID]
+        <dims> = any combination of app, user, provider, model (e.g. app-provider, user-model)
 """
 
 from __future__ import annotations
@@ -101,7 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     p_rep.add_argument("--until")
     p_rep.add_argument(
         "--by", default="app-provider",
-        choices=["app", "provider", "app-provider", "model", "user", "app-user"],
+        help="Any combination of app, user, provider, model joined by '-' or ','"
+             " (e.g. app-provider, user-model, model). Default: app-provider.",
     )
     p_rep.add_argument("--user", help="Filter to a single external user id")
 
@@ -138,12 +140,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Starting API-Tracker ingest on {args.host}:{args.port}")
             uvicorn.run(create_app(Tracker(db)), host=args.host, port=args.port)
         elif args.cmd == "report":
-            rows = db.report(
-                since=_parse_dt(args.since),
-                until=_parse_dt(args.until),
-                group_by=args.by,
-                user=args.user,
-            )
+            try:
+                rows = db.report(
+                    since=_parse_dt(args.since),
+                    until=_parse_dt(args.until),
+                    group_by=args.by,
+                    user=args.user,
+                )
+            except ValueError as e:
+                print(f"error: {e}", file=sys.stderr)
+                return 2
             _print_report(rows)
     finally:
         db.close()

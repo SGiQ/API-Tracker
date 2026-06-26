@@ -163,6 +163,13 @@ def test_report_rejects_bad_group_by():
     assert resp.status_code == 400
 
 
+def test_report_accepts_arbitrary_dimension_combo():
+    client, tracker = _client(dashboard_key="secret")
+    resp = client.get("/v1/report?by=user-model", headers={"X-Dashboard-Key": "secret"})
+    assert resp.status_code == 200
+    assert tracker.db.last_report["group_by"] == "user-model"
+
+
 def test_dashboard_page_served():
     client, _ = _client(dashboard_key="secret")
     resp = client.get("/")

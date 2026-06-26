@@ -7,6 +7,7 @@ the queries are explicit. All money is handled as :class:`decimal.Decimal`.
 from __future__ import annotations
 
 import os
+import re
 from contextlib import contextmanager
 from datetime import datetime
 from decimal import Decimal
@@ -21,6 +22,27 @@ from .pricing import Rate
 from .usage import Usage
 
 _SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.sql"
+
+# The dimensions a report can be grouped by, in canonical display order.
+DIMENSIONS = ("app", "user", "provider", "model")
+
+
+def parse_dimensions(group_by: str) -> list[str]:
+    """Parse a ``group_by`` string into an ordered, de-duplicated dimension list.
+
+    Accepts any combination of :data:`DIMENSIONS` separated by ``-`` or ``,``
+    (e.g. ``"app-provider"``, ``"user,model"``, ``"model"``). Output is always in
+    canonical order regardless of input order. Raises ``ValueError`` on an unknown
+    or empty selection.
+    """
+    requested = [d.strip() for d in re.split(r"[-,]", group_by or "") if d.strip()]
+    unknown = [d for d in requested if d not in DIMENSIONS]
+    if unknown:
+        raise ValueError(f"unknown dimension(s) {unknown}; valid: {list(DIMENSIONS)}")
+    chosen = [d for d in DIMENSIONS if d in requested]
+    if not chosen:
+        raise ValueError("group_by must include at least one of " + ", ".join(DIMENSIONS))
+    return chosen
 
 
 class Database:
@@ -271,19 +293,11 @@ class Database:
     ) -> list[dict]:
         """Aggregate usage and cost over a time window.
 
-        ``group_by`` is one of ``app``, ``provider``, ``app-provider``, ``model``,
-        ``user``, ``app-user``. ``user`` optionally filters to a single user id.
+        ``group_by`` is any combination of :data:`DIMENSIONS` (``app``, ``user``,
+        ``provider``, ``model``) joined by ``-`` or ``,`` -- e.g. ``"app-provider"``,
+        ``"user,model"``, ``"model"``. ``user`` optionally filters to a single user id.
         """
-        dims = {
-            "app": ["app"],
-            "provider": ["provider"],
-            "app-provider": ["app", "provider"],
-            "model": ["app", "provider", "model"],
-            "user": ["user"],
-            "app-user": ["app", "user"],
-        }
-        if group_by not in dims:
-            raise ValueError(f"group_by must be one of {sorted(dims)}")
+        chosen = parse_dimensions(group_by)
 
         select_cols = {
             "app": "COALESCE(a.slug, '(unattributed)') AS app",
@@ -297,8 +311,8 @@ class Database:
             "model": "e.model",
             "user": "COALESCE(e.external_user_id, '(none)')",
         }
-        cols = [select_cols[d] for d in dims[group_by]]
-        group_exprs = [group_expr[d] for d in dims[group_by]]
+        cols = [select_cols[d] for d in chosen]
+        group_exprs = [group_expr[d] for d in chosen]
 
         where = []
         params: dict = {}
